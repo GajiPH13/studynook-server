@@ -63,9 +63,10 @@ app.get('/rooms/:id', async (req, res) => {
 })
 
 // myBookings endpoint
-app.get('/my-bookings', async (req, res) => {
+app.get('/my-bookings/:userId', async (req, res) => {
   try {
-    const result = await bookingsCollection.find().toArray();
+    const userId =await req.params.userId;
+    const result = await bookingsCollection.find({userId: userId}).toArray();
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -102,6 +103,16 @@ app.put('/rooms/:id', async (req, res) => {
       { _id: new ObjectId(id) },
       { $set: updatedRoom }
     );
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+})
+
+app.delete('/bookings/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const result = await bookingsCollection.deleteOne({ _id: new ObjectId(id) });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
