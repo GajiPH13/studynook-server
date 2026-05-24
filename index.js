@@ -61,6 +61,17 @@ app.get('/rooms/:id', async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 })
+
+// myBookings endpoint
+app.get('/my-bookings', async (req, res) => {
+  try {
+    const result = await bookingsCollection.find().toArray();
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+})
+
 app.post('/rooms', async (req, res) => {
   try {
     const newRoom = req.body;
