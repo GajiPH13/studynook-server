@@ -95,11 +95,11 @@ app.post('/bookings', async (req, res) => {
 
 
 
-app.put('/rooms/:id', async (req, res) => {
+app.patch('/bookings/:id', async (req, res) => {
   try {
     const id = req.params.id;
     const updatedRoom = req.body;
-    const result = await roomsCollection.updateOne(
+    const result = await bookingsCollection.updateOne(
       { _id: new ObjectId(id) },
       { $set: updatedRoom }
     );
