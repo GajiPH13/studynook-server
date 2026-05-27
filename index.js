@@ -43,14 +43,30 @@ app.get('/', (req, res) => {
   res.send('Hello World!')
 })
 
+// app.get('/rooms', async (req, res) => {
+//   try {
+//     const result = await roomsCollection.find().toArray();
+//     res.send(result);
+//   } catch (error) {
+//     res.status(500).send({ error: error.message });
+//   }
+// })
+
 app.get('/rooms', async (req, res) => {
   try {
-    const result = await roomsCollection.find().toArray();
+    const limit = parseInt(req.query.limit) || 0;
+
+    const query = roomsCollection.find();
+
+    const result = limit > 0
+      ? await query.limit(limit).toArray()
+      : await query.toArray();
+
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
-})
+});
 
 app.get('/rooms/:id', async (req, res) => {
   try {
