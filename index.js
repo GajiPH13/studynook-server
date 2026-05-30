@@ -130,6 +130,22 @@ app.post('/rooms',verifyJWT, async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 })
+// Room Edit
+app.patch('/rooms/:id',verifyJWT, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updatedRoom = {...req.body};
+    delete updatedRoom._id;
+    const result = await roomsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updatedRoom }
+    );
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+})
+
 
 app.post('/bookings', verifyJWT, async (req, res) => {
   try {
@@ -166,7 +182,7 @@ app.delete('/bookings/:id', verifyJWT, async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 })
-app.delete('/rooms/:id', async (req, res) => {
+app.delete('/rooms/:id', verifyJWT, async (req, res) => {
   try {
     const id = req.params.id;
     const result = await roomsCollection.deleteOne({ _id: new ObjectId(id) });
