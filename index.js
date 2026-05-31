@@ -3,9 +3,9 @@
 const express = require('express')
 const dotenv = require('dotenv')
 const cors = require('cors')
-const { ObjectId } = require('mongodb');
+// const { ObjectId } = require('mongodb');
 dotenv.config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const { createRemoteJWKSet, jwtVerify } = require('jose-cjs');
 
 const app = express()
@@ -24,7 +24,7 @@ const client = new MongoClient(uri, {
 });
 
 const JWKS = createRemoteJWKSet(
-  new URL('http://localhost:3000/api/auth/jwks')
+  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
 )
 const verifyJWT = async (req, res, next) => {
   const authHeader = req?.headers.authorization;
@@ -41,22 +41,180 @@ const verifyJWT = async (req, res, next) => {
     console.log(payload);
     next();
   } catch (error) {
-    return res.status(401).send({ message: 'unauthorized access' });
+    return res.status(403).send({ message: 'unauthorized access' });
   }
 
 
 };
 
-let roomsCollection;
-let bookingsCollection;
+
 
 async function connectDB() {
   try {
-    await client.connect();
+    // await client.connect();
     const db = client.db('studynook');
-    roomsCollection = db.collection('rooms');
-    bookingsCollection = db.collection('bookings');
-    await client.db("admin").command({ ping: 1 });
+    const roomsCollection = db.collection('rooms');
+    const bookingsCollection = db.collection('bookings');
+
+    app.get('/rooms', async (req, res) => {
+      try {
+        const limit = parseInt(req.query.limit) || 0;
+
+        const query = roomsCollection.find();
+
+        const result = limit > 0
+          ? await query.limit(limit).toArray()
+          : await query.toArray();
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    });
+    // Middleware
+   app.get('/rooms/:id', verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await roomsCollection.findOne(query);
+      res.json(result);
+    })
+
+// app.get('/rooms/:id',  async (req, res) => {
+//   console.log("REQUEST:", req.method, req.url);
+
+//   const id = req.params.id;
+
+//   console.log("ROOM ID RAW:", JSON.stringify(id));
+
+//   if (!id || !ObjectId.isValid(id)) {
+//     return res.status(400).send({
+//       error: "Invalid or missing room id",
+//       received: id
+//     });
+//   }
+
+//   try {
+//     const room = await roomsCollection.findOne({
+//       _id: new ObjectId(id)
+//     });
+
+//     return res.send(room);
+//   } catch (err) {
+//     console.error("DB ERROR:", err);
+//     return res.status(500).send({ error: err.message });
+//   }
+// });
+// console.log("ObjectId type:", typeof ObjectId);
+// console.log("ObjectId constructor:", ObjectId?.name);
+    // app.get('/rooms/:id', verifyJWT,
+    //   async (req, res) => {
+    //     try {
+    //       const id = req.params.id;
+    //       const result = await roomsCollection.findOne({ _id: new ObjectId(id) });
+    //       console.log("RESULT",result);
+    //       res.send(result);
+    //     } catch (error) {
+    //       res.status(500).send({ error: error.message });
+    //     }
+    //   })
+
+    // myBookings endpoint
+    app.get('/my-bookings/:userId', verifyJWT, async (req, res) => {
+      try {
+        const userId = await req.params.userId;
+        const result = await bookingsCollection.find({ userId: userId }).toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    })
+
+    // My listings endpoint
+    app.get('/my-listings/:userId', verifyJWT, async (req, res) => {
+      try {
+        const userId = await req.params.userId;
+        const result = await roomsCollection.find({ userId: userId }).toArray();
+
+        res.send(result);
+        console.log(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    })
+
+    app.post('/rooms', verifyJWT, async (req, res) => {
+      try {
+        const newRoom = req.body;
+        const result = await roomsCollection.insertOne(newRoom);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    })
+    // Room Edit
+    app.patch('/rooms/:id', verifyJWT, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedRoom = { ...req.body };
+        delete updatedRoom._id;
+        const result = await roomsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updatedRoom }
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    })
+
+
+    app.post('/bookings', verifyJWT, async (req, res) => {
+      try {
+        const newRoom = req.body;
+        const result = await bookingsCollection.insertOne(newRoom);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    })
+
+
+
+    app.patch('/bookings/:id', verifyJWT, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedRoom = req.body;
+        const result = await bookingsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updatedRoom }
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    })
+
+    app.delete('/bookings/:id', verifyJWT, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const result = await bookingsCollection.deleteOne({ _id: new ObjectId(id) });
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    })
+    app.delete('/rooms/:id', verifyJWT, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const result = await roomsCollection.deleteOne({ _id: new ObjectId(id) });
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    })
+
+
+    // await client.db("admin").command({ ping: 1 });
     console.log("Connected to MongoDB!");
   } catch (error) {
     console.error("Database connection failed:", error);
@@ -70,127 +228,6 @@ app.get('/', (req, res) => {
 
 
 
-app.get('/rooms', async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit) || 0;
-
-    const query = roomsCollection.find();
-
-    const result = limit > 0
-      ? await query.limit(limit).toArray()
-      : await query.toArray();
-
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-});
-// Middleware
-app.get('/rooms/:id', verifyJWT,
-  async (req, res) => {
-    try {
-      const id = req.params.id;
-      const result = await roomsCollection.findOne({ _id: new ObjectId(id) });
-      res.send(result);
-    } catch (error) {
-      res.status(500).send({ error: error.message });
-    }
-  })
-
-// myBookings endpoint
-app.get('/my-bookings/:userId', verifyJWT, async (req, res) => {
-  try {
-    const userId = await req.params.userId;
-    const result = await bookingsCollection.find({ userId: userId }).toArray();
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-})
-
-// My listings endpoint
-app.get('/my-listings/:userId', verifyJWT, async (req, res) => {
-  try {
-    const userId = await req.params.userId;
-    const result = await roomsCollection.find({ userId: userId }).toArray();
-
-    res.send(result);
-    console.log(result);
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-})
-
-app.post('/rooms',verifyJWT, async (req, res) => {
-  try {
-    const newRoom = req.body;
-    const result = await roomsCollection.insertOne(newRoom);
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-})
-// Room Edit
-app.patch('/rooms/:id',verifyJWT, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const updatedRoom = {...req.body};
-    delete updatedRoom._id;
-    const result = await roomsCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: updatedRoom }
-    );
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-})
-
-
-app.post('/bookings', verifyJWT, async (req, res) => {
-  try {
-    const newRoom = req.body;
-    const result = await bookingsCollection.insertOne(newRoom);
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-})
-
-
-
-app.patch('/bookings/:id',verifyJWT, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const updatedRoom = req.body;
-    const result = await bookingsCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: updatedRoom }
-    );
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-})
-
-app.delete('/bookings/:id', verifyJWT, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const result = await bookingsCollection.deleteOne({ _id: new ObjectId(id) });
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-})
-app.delete('/rooms/:id', verifyJWT, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const result = await roomsCollection.deleteOne({ _id: new ObjectId(id) });
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-})
 
 connectDB().then(() => {
   app.listen(port, () => {
